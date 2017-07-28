@@ -1,2 +1,2 @@
 # CronAPI-py
-Lightweight API for CronScript projects.
+Lightweight python API written on the microframework Flask for CronScript projects.
