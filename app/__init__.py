@@ -2,10 +2,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from config import get_database_uri
 
-
-
 app = Flask(__name__)
-
 app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
 db = SQLAlchemy(app)
 
@@ -19,4 +16,5 @@ def create_db():
     db.create_all()
 
 
-
+if __name__ == '__main__':
+    app.run(debug=True, host='localhost')

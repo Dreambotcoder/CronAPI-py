@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 from flask import Blueprint, request, abort, render_template
 
 from requests.models import json_dumps
-
 from app import db
 from app.model.rooms import Room
 from app.model.bot import Bot
