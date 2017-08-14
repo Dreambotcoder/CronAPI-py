@@ -35,6 +35,10 @@ class Bot(db.Model):
     def get_bots():
         return db.session.query(Bot)
 
+    @staticmethod
+    def get_bots_for_room(web_token):
+        return db.session.query(Bot).join(Bot.room).filter(Room.token == web_token)
+
 
 class Script(db.Model):
     __tablename__ = "scripts"

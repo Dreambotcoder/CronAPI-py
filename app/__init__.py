@@ -8,10 +8,11 @@ db = SQLAlchemy(app)
 
 from controllers.api import api_controller
 from controllers.botdata import bot_controller
+from controllers.phoneapp import phone_controller
 
 app.register_blueprint(api_controller)
 app.register_blueprint(bot_controller)
-
+app.register_blueprint(phone_controller)
 
 @app.before_first_request
 def create_db():
