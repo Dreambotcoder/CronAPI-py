@@ -7,3 +7,8 @@ def get_database_uri():
                                              'cronapi'
                                              )
     return db_connection
+
+
+def get_backend_token():
+    return "fuck-me-hard-daddy"
+

@@ -5,18 +5,41 @@ from flask import Blueprint, request, abort, render_template
 
 from requests.models import json_dumps
 from app import db
-from app.model.rooms import Room
-from app.model.bot import Bot
-from app.model.bot import Script
+from app.config import get_backend_token
+from app.model.dbmodels import Script, Room, Bot
 
 api_controller = Blueprint('api', __name__)
 
 
+@api_controller.route('/heartbeat')
+def heartbeat():
+    return "ALIVE"
+
+
 @api_controller.route('/')
 def hello_world():
-    return "<h1>Welcome to CronAPI</h1>" \
+    return "<h1>Welcome to CronAPI 1.17</h1>" \
            "<br>" \
            "<h3>Contact Articron if you want to use this API</h3>"
+
+
+@api_controller.route("/api/script_for_room", methods=['POST'])
+def get_script_for_room():
+    web_token = request.json.get("web_token")
+    script = Script.get_scripts().join(Script.rooms).filter(Room.token == web_token).first()
+    response = {}
+    if script is not None:
+        script_data = [{
+            "script_id": script.id,
+            "script_name": script.script_name,
+            "script_author": script.author_name,
+            "script_category": script.script_category
+        }]
+        response['status_code'] = 200
+        response['script_data'] = script_data
+    response['status_code'] = 400
+    print json_dumps(response, default=json_serial)
+    return json_dumps(response, default=json_serial)
 
 
 @api_controller.route("/api/scripts/", methods=['POST'])
@@ -28,12 +51,63 @@ def get_script():
     script_data = [{
         "script_id": script.id,
         "script_name": script.script_name,
-        "script_author": script.author_name
+        "script_author": script.author_name,
+        "script_category": script.script_category
     }]
 
     response['status_code'] = 200
     response['message'] = "Script details for script with id " + script_id
     response['script_data'] = script_data
+
+    return json_dumps(response, default=json_serial)
+
+
+@api_controller.route("/api/bots/specific", methods=['POST'])
+def get_specific_bot():
+    web_token = request.json.get("web_token")
+    bot_id = request.json.get("bot_id")
+    response = {}
+    bot_data = []
+    bot = Bot.get_bots().filter(Bot.id == bot_id).join(Bot.room).filter(Room.token == web_token).first()
+    if bot is None:
+        return abort(400)
+    bot_data.append({
+        "bot_name": bot.ingame_name,
+        "ip_address": bot.ip_address,
+        "game_data": bot.data,
+        "clock_in": bot.clock_in,
+        "clock_out": bot.clock_out,
+        "active": bot.active,
+        "script_id": bot.script_id
+    })
+    response['bot_data'] = bot_data
+    print json_dumps(response, default=json_serial)
+    return json_dumps(response, default=json_serial)
+
+
+@api_controller.route("/api/bots/web", methods=['POST'])
+def get_bots_for_room_web():
+    bots = Bot.get_bots()
+    response = {}
+    bot_data = []
+    web_token = request.json.get("web_token")
+    filtered_bots = bots.join(Bot.room).filter(Room.token == web_token)
+
+    for bot in filtered_bots.all():
+        bot_data.append({
+            "bot_id" : bot.id,
+            "bot_name": bot.ingame_name,
+            "ip_address": bot.ip_address,
+            "game_data": bot.data,
+            "clock_in": bot.clock_in,
+            "clock_out": bot.clock_out,
+            "active": bot.active,
+            "script_id": bot.script_id
+        })
+    response['bot_data'] = bot_data
+    response['status_code'] = 200
+    response['message'] = "All bots for web token " + web_token
+    print json_dumps(response, default=json_serial)
     return json_dumps(response, default=json_serial)
 
 
@@ -89,8 +163,24 @@ def room_exists():
     return "A_E"
 
 
-@api_controller.route("/api/authenticate/form", methods=["POST"])
+
+@api_controller.route("/api/authenticate", methods=['POST'])
 def check_room():
+    web_token = request.json.get("web_token")
+    token_pass = request.json.get("token_pass")
+    print web_token
+    print token_pass
+    room = Room.get_rooms().filter(Room.token == web_token).first()
+    if room is not None:
+        if room.token_pass == token_pass:
+            print "valid credentials entered: [" + web_token + " : " + token_pass + "]"
+            return " "
+    print "incorrect credentials"
+    return abort(400)
+
+
+@api_controller.route("/api/authenticate/form", methods=["POST"])
+def check_room_by_form():
     frm = request.form
     web_token = frm['web_token']
     token_pass = request.form.get("token_pass")
@@ -99,6 +189,29 @@ def check_room():
         if room.token_pass == token_pass:
             return " "
     return abort(400)
+
+
+@api_controller.route("/api/backend/all_scripts", methods=['POST'])
+def get_all_scripts():
+    backend_token = request.json.get("backend-token")
+    response = {}
+    result = []
+    if backend_token != get_backend_token():
+        return abort(400)
+    else:
+        scripts = Script.get_scripts()
+        for script in scripts.limit(4).all():  # todo add DESC by time
+            result.append({
+                "script_id": script.id,
+                "script_name": script.script_name,
+                "script_category": script.script_category,
+                "script_author": script.author_name,
+                "script_description": script.script_description,
+                "script_topic_url": script.script_topic,
+                "script_image": script.script_image
+            })
+        response['result'] = result
+        return json_dumps(response, default=json_serial)
 
 
 @api_controller.route('/api/loot/<string:npc_name>/', methods=["GET"])
@@ -151,11 +264,6 @@ def get_drops(npc_name):
                     wiki_price = ""
             row_id += 1
     return toReturn
-
-
-@api_controller.route('/cronfighter/new/', methods=['GET'])
-def create_fighter_ui():
-    return render_template("fighter_settings.html")
 
 
 # JSON serializer for objects not serializable by default json code
