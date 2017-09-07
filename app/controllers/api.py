@@ -136,11 +136,12 @@ def get_bots_for_room():
     return json_dumps(response, default=json_serial)
 
 
-@api_controller.route("/api/rooms/add", methods=['POST'])
+@api_controller.route("/api/rooms/create", methods=['POST'])
 def add_room():
-    data = request.form
-    web_token = data["token"]
-    token_pass = data['pass']
+    web_token = request.authorization.username
+    token_pass = request.authorization.password
+    script_id = request.json.get("script_id")
+    print str(script_id)
     room = Room.get_rooms().filter(Room.token == web_token).first()
     if room is not None:
         return "A_E"
@@ -148,6 +149,7 @@ def add_room():
         toAdd = Room()
         toAdd.token = web_token
         toAdd.token_pass = token_pass
+        toAdd.script_id = script_id
         db.session.add(toAdd)
         db.session.commit()
     return "C"
@@ -163,6 +165,17 @@ def room_exists():
     return "A_E"
 
 
+@api_controller.route("/api/script/authenticate", methods=["POST"])
+def auth_room():
+    web_token = request.authorization.username
+    token_pass = request.authorization.password
+    room = Room.get_rooms().filter(Room.token == web_token).first()
+    if room is not None:
+        if room.token_pass == token_pass:
+            return "L_I"
+        else:
+            return "I_C"
+    return "N_E"
 
 @api_controller.route("/api/authenticate", methods=['POST'])
 def check_room():
@@ -275,3 +288,8 @@ def json_serial(obj):
         serial = obj.strftime("%Y-%m-%d")
         return serial
     raise TypeError("Type not serializable")
+
+
+def authenticate(token, token_pass):
+    room = Room.get_rooms().filter(Room.token == token, Room.token_pass == token_pass).first()
+    return room is not None
