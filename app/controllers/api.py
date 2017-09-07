@@ -67,7 +67,7 @@ def get_specific_bot():
     web_token = request.json.get("web_token")
     bot_id = request.json.get("bot_id")
     response = {}
-    bot_data = []
+    bot_data = [] #
     bot = Bot.get_bots().filter(Bot.id == bot_id).join(Bot.room).filter(Room.token == web_token).first()
     if bot is None:
         return abort(400)
