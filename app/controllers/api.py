@@ -18,7 +18,7 @@ def heartbeat():
 
 @api_controller.route('/')
 def hello_world():
-    return "<h1>Welcome to CronAPI 1.02</h1>" \
+    return "<h1>Welcome to CronAPI 1.3</h1>" \
            "<br>" \
            "<h3>Contact Articron if you want to use this API</h3>"
 
