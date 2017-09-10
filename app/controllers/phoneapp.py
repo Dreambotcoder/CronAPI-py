@@ -1,3 +1,5 @@
+from pprint import pprint
+
 from flask import Blueprint, request, abort, json
 from app import db
 from app.model.dbmodels import Room, Script, Bot
@@ -22,15 +24,18 @@ def botlist_concrete(id):
     game_data = {}
     if authenticate(auth.username,auth.password):
         bot = Bot.get_bots().filter(Bot.id == id).join(Bot.room).filter(Room.token == auth.username).first()
+
+        data = json.loads(bot.data)
         if bot:
             game_data = {
                 "alias" : bot.ingame_name,
                 "ip" : bot.ip_address,
                 "clock_in" : bot.clock_in,
-                "data" : bot.data
+                "data" : data
             }
         else:
             abort(400)
+        print json.dumps(game_data)
         return json.dumps(game_data)
     else:
         abort(400)
