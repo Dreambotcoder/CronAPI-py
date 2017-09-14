@@ -1,7 +1,7 @@
 import datetime
 import requests
 from bs4 import BeautifulSoup
-from flask import Blueprint, request, abort, render_template
+from flask import Blueprint, request, abort, render_template, json
 
 from requests.models import json_dumps
 from app import db
@@ -68,13 +68,15 @@ def get_specific_bot():
     bot_id = request.json.get("bot_id")
     response = {}
     bot_data = [] #
+    print "BOT_ID = " + str(bot_id)
     bot = Bot.get_bots().filter(Bot.id == bot_id).join(Bot.room).filter(Room.token == web_token).first()
     if bot is None:
         return abort(400)
+    data = json.loads(bot.data)
     bot_data.append({
         "bot_name": bot.ingame_name,
         "ip_address": bot.ip_address,
-        "game_data": bot.data,
+        "game_data": data,
         "clock_in": bot.clock_in,
         "clock_out": bot.clock_out,
         "active": bot.active,

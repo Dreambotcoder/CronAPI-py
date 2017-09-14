@@ -1,3 +1,5 @@
+from pprint import pprint
+
 from flask import Blueprint, json
 import datetime
 import requests
@@ -50,6 +52,17 @@ def put_bots():
         newBot.data = json.dumps(data)
         db.session.add(newBot)
         db.session.commit()
+        json_dict = {
+            "web_token": auth.username,
+            "bot_alias" : newBot.ingame_name,
+            "bot_id": int(newBot.id),
+            "ip_address": newBot.ip_address,
+            "clock_in": str(newBot.clock_in)
+        }
+        pprint(json_dict)
+        requests.post("http://127.0.0.1:5000/" + "emit", #todo fix this shit
+                      json= json_dict
+                      )
         return "H_U"
 
     else:
