@@ -16,6 +16,60 @@ def heartbeat():
     return "ALIVE"
 
 
+@api_controller.route('/api/remote/check', methods=["POST"])
+def check_bot_cmd():
+    bot_alias = request.json.get("bot_alias")
+    web_token = request.authorization.username
+    token_pass = request.authorization.password
+    if authenticate(web_token, token_pass):
+        bot = Bot.get_bots(
+        ).join(
+            Bot.room
+        ).filter(
+            Room.token == web_token
+        ).filter(
+            Bot.ingame_name == bot_alias
+        ).first()
+        if bot:
+            if len(bot.commands) <= 0:
+                return ""
+            command_context = bot.commands[0]
+            cmd_name = command_context.command.name
+            db.session.delete(command_context)
+            db.session.commit()
+            return cmd_name
+        else:
+            return ""
+    else:
+        return ""
+
+
+
+
+@api_controller.route('/api/list/commands', methods=["POST"])
+def command_list():
+    script_key = request.json.get("api_key")
+    script = Script.get_scripts().filter(Script.api_key == script_key).first()
+    data = {}
+    commands = []
+    if script:
+        for command in script.cmd_to_scripts:
+            commands.append(command.command.name)
+        data["commands"] = commands
+        return json.dumps(data, default=json_serial)
+    return abort(400)
+
+
+@api_controller.route('/api/')
+@api_controller.route('/api/remote')
+def remote():
+    bot = Bot.get_bots().filter(Bot.id == 1).first()
+    script = Script.get_scripts().filter(Script.id == 1).first()
+    for command in script.cmd_to_scripts:
+        print command.command.name
+    return ""
+
+
 @api_controller.route('/')
 def hello_world():
     return "<h1>Welcome to CronAPI 1.3</h1>" \
@@ -67,7 +121,7 @@ def get_specific_bot():
     web_token = request.json.get("web_token")
     bot_id = request.json.get("bot_id")
     response = {}
-    bot_data = [] #
+    bot_data = []  #
     print "BOT_ID = " + str(bot_id)
     bot = Bot.get_bots().filter(Bot.id == bot_id).join(Bot.room).filter(Room.token == web_token).first()
     if bot is None:
@@ -97,7 +151,7 @@ def get_bots_for_room_web():
 
     for bot in filtered_bots.all():
         bot_data.append({
-            "bot_id" : bot.id,
+            "bot_id": bot.id,
             "bot_name": bot.ingame_name,
             "ip_address": bot.ip_address,
             "game_data": bot.data,
@@ -178,6 +232,7 @@ def auth_room():
         else:
             return "I_C"
     return "N_E"
+
 
 @api_controller.route("/api/authenticate", methods=['POST'])
 def check_room():

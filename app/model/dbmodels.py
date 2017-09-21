@@ -2,14 +2,13 @@ from app import db
 
 
 class Room(db.Model):
-    __tablename__= "rooms"
+    __tablename__ = "rooms"
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     token = db.Column(db.String(100), nullable=False)
-    token_pass = db.Column(db.String(100),nullable=False)
+    token_pass = db.Column(db.String(100), nullable=False)
     script_id = db.Column(db.Integer, db.ForeignKey("scripts.id"))
 
     script = db.relationship("Script", foreign_keys=script_id, backref="rooms")
-
 
     @staticmethod
     def get_rooms():
@@ -45,6 +44,7 @@ class Script(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     script_name = db.Column(db.String(100), nullable=False)
     author_name = db.Column(db.String(100), nullable=False)
+    api_key = db.Column(db.String(100), nullable=False)
     script_category = db.Column(db.String(100), nullable=False)
     script_description = db.Column(db.String(1000), nullable=False)
     script_topic = db.Column(db.String(500), nullable=False)
@@ -53,3 +53,30 @@ class Script(db.Model):
     @staticmethod
     def get_scripts():
         return db.session.query(Script)
+
+
+class RemoteCommand(db.Model):
+    __tablename__ = "remote_command"
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(10000))
+
+
+class CommandToScript(db.Model):
+    __tablename__ = "cmd_to_script"
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    command_id = db.Column(db.Integer, db.ForeignKey('remote_command.id'))
+    script_id = db.Column(db.Integer, db.ForeignKey('scripts.id'))
+
+    command = db.relationship(RemoteCommand, foreign_keys=command_id, backref="cmd_to_scripts")
+    script = db.relationship(Script, foreign_keys=script_id, backref='cmd_to_scripts')
+
+
+class BotCommand(db.Model):
+    __tablename__ = "bot_command"
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    command_id = db.Column(db.Integer, db.ForeignKey('remote_command.id'))
+    bot_id = db.Column(db.Integer, db.ForeignKey('bots.id'))
+
+    command = db.relationship(RemoteCommand, foreign_keys=command_id, backref="commands")
+    bot = db.relationship(Bot, foreign_keys=bot_id, backref='commands')

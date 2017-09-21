@@ -1,20 +1,48 @@
 from pprint import pprint
 
-from flask import Blueprint, json
+from flask import json
 import datetime
 import requests
-from flask import Blueprint, request, abort, render_template
+from flask import Blueprint, request, abort
 
 from requests.models import json_dumps
 from app import db
+from app.config import get_website_link
 from app.model.dbmodels import Room, Bot
 
 bot_controller = Blueprint('bot_controller', __name__)
 
 
+@bot_controller.route('/api/room/bots/remove', methods=["POST"])
+def remove_bots():
+    auth = request.authorization
+    alias = request.json.get("alias")
+    if authenticate(auth.username, auth.password):
+        bot = Bot.get_bots().filter(Bot.ingame_name == alias) \
+            .join(Bot.room) \
+            .filter(Room.token == auth.username, Room.token_pass == auth.password).first()
+        if bot:
+            db.session.delete(bot)
+            db.session.commit()
+            json_dict = {
+                "web_token": auth.username,
+                "bot_id": bot.id,
+                "bot_name" : bot.ingame_name
+            }
+            requests.post(
+                get_website_link() + "emit/remove",
+                json=json_dict
+            )
+            return "C_D"
+        return abort(400)
+    else:
+        return abort(400)
+
+
 @bot_controller.route("/api/room/bots/update", methods=["POST"])
 def update_bots():
     auth = request.authorization
+    pprint(json.dumps(request.json))
     alias = request.json.get("alias")
     data = request.json.get("data")
     if authenticate(auth.username, auth.password):
@@ -22,9 +50,18 @@ def update_bots():
             .join(Bot.room) \
             .filter(Room.token == auth.username, Room.token_pass == auth.password).first()
         if bot:
-            bot.data = data
+            bot.data = str(json_dumps(data))
             db.session.add(bot)
             db.session.commit()
+            json_dict = {
+                "bot_id": bot.id,
+                "web_token": auth.username,
+                "data": json.loads(bot.data)
+            }
+            pprint(json_dict)
+            requests.post(get_website_link() + "emit/update",  # todo fix this shit
+                          json=json_dict
+                          )
             return "B_U"
         else:
             return "N_B_F"
@@ -54,14 +91,14 @@ def put_bots():
         db.session.commit()
         json_dict = {
             "web_token": auth.username,
-            "bot_alias" : newBot.ingame_name,
+            "bot_alias": newBot.ingame_name,
             "bot_id": int(newBot.id),
             "ip_address": newBot.ip_address,
             "clock_in": str(newBot.clock_in)
         }
         pprint(json_dict)
-        requests.post("http://127.0.0.1:5000/" + "emit", #todo fix this shit
-                      json= json_dict
+        requests.post(get_website_link() + "emit",  # todo fix this shit
+                      json=json_dict
                       )
         return "H_U"
 

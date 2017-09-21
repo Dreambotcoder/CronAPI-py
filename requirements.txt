@@ -1,3 +1,4 @@
+configobj
 Flask==0.12
 Flask-SQLAlchemy==2.2
 SQLAlchemy==1.1.6
