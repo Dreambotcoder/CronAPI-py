@@ -1,12 +1,14 @@
 import datetime
+from pprint import pprint
+
 import requests
 from bs4 import BeautifulSoup
-from flask import Blueprint, request, abort, render_template, json
+from flask import Blueprint, request, abort, json
 
 from requests.models import json_dumps
 from app import db
-from app.config import get_backend_token
-from app.model.dbmodels import Script, Room, Bot
+from app.config import get_backend_token, get_website_link
+from app.model.dbmodels import Script, Room, Bot, Announcements
 
 api_controller = Blueprint('api', __name__)
 
@@ -14,6 +16,42 @@ api_controller = Blueprint('api', __name__)
 @api_controller.route('/heartbeat')
 def heartbeat():
     return "ALIVE"
+
+
+@api_controller.route('/api/remote/update/process', methods=["POST"])
+def update_remote_process():
+    web_token = request.authorization.username
+    if authenticate(web_token, request.authorization.password):
+        bot_alias = request.json.get("bot_alias")
+        command = request.json.get("command")
+        report_message = request.json.get("report_message")
+        report_percentage = str(request.json.get("report_percentage"))
+
+        bot = Bot.get_bots().filter(Bot.ingame_name == bot_alias).first()
+        if bot:
+            if bot.processing_commands:
+                command_entry = bot.processing_commands[0]
+                if command_entry.command.name == command:
+                    command_entry.progression_message = report_message
+                    command_entry.progress_percentage = int(report_percentage)
+                    db.session.add(command_entry)
+                    db.session.commit()
+                    print 'committed'
+                    data_dict = {
+                        "bot_id": bot.id,
+                        "bot_name" : bot.ingame_name,
+                        "web_token": web_token,
+                        "percentage" : report_percentage,
+                        "message" : report_message
+                    }
+                    print 'posting'
+                    try :
+                        requests.post(get_website_link() + "/emit/remote/process", json=data_dict)
+                    except Exception as e:
+                        print e
+                    print 'posted'
+                return "OK"
+        return abort(401)
 
 
 @api_controller.route('/api/remote/check', methods=["POST"])
@@ -41,9 +79,20 @@ def check_bot_cmd():
         else:
             return ""
     else:
-        return ""
+        return abort(401)
 
 
+@api_controller.route('/api/announcements', methods=["GET"])
+def get_announcements():
+    announcements = Announcements.get_latest().limit(5)
+    data = []
+    for announcement in announcements:
+        data.append({
+            "post_date": announcement.post_date.strftime('%d %B %Y'),
+            "text": announcement.text,
+            "title": announcement.title
+        })
+    return json.dumps(data, default=json_serial)
 
 
 @api_controller.route('/api/list/commands', methods=["POST"])
@@ -60,14 +109,17 @@ def command_list():
     return abort(400)
 
 
-@api_controller.route('/api/')
-@api_controller.route('/api/remote')
+@api_controller.route('/api/remote', methods=["POST"])
 def remote():
-    bot = Bot.get_bots().filter(Bot.id == 1).first()
-    script = Script.get_scripts().filter(Script.id == 1).first()
+    script_id = request.json.get("script_id")
+    script = Script.get_scripts().filter(Script.id == script_id).first()
+    commands = []
     for command in script.cmd_to_scripts:
-        print command.command.name
-    return ""
+        commands.append({
+            "name": command.command.name,
+            "description": command.command.description
+        })
+    return json.dumps(commands, default=json_serial)
 
 
 @api_controller.route('/')
@@ -137,6 +189,47 @@ def get_specific_bot():
         "script_id": bot.script_id
     })
     response['bot_data'] = bot_data
+    print json_dumps(response, default=json_serial)
+    return json_dumps(response, default=json_serial)
+
+
+@api_controller.route('/api/bots/web/format/remote', methods=['POST'])
+def get_compact_bots_for_room():
+    bots = Bot.get_bots()
+    response = {}
+    bot_data = []
+    processed_data = []
+    polling_data = []
+    web_token = request.json.get("web_token")
+    script_id = request.json.get("script_id")
+    all_bots = bots.join(Bot.room).filter(Room.token == web_token).filter(Room.script_id == script_id)
+    i = 0
+    for bot in all_bots.all():
+        print "index i = " + str(i)
+        processing_command = bot.processing_commands
+        polling_command = bot.commands
+        if processing_command and len(processing_command) > 0:
+            command = processing_command[0]
+            processed_data.append({
+                "bot_name": bot.ingame_name,
+                "remote_percentage": command.progress_percentage,
+                "remote_message": command.progression_message,
+                "remote_command": command.command.name
+            })
+        elif polling_command and len(polling_command) > 0:
+            polling_data.append({
+                "bot_name": bot.ingame_name,
+                "remote_command": polling_command[0].command.name
+            })
+        else:
+            bot_data.append({
+                "bot_id": bot.id,
+                "bot_name": bot.ingame_name
+            })
+        i += 1
+    response['available'] = bot_data
+    response['processing'] = processed_data
+    response['polling'] = polling_data
     print json_dumps(response, default=json_serial)
     return json_dumps(response, default=json_serial)
 
@@ -238,13 +331,14 @@ def auth_room():
 def check_room():
     web_token = request.json.get("web_token")
     token_pass = request.json.get("token_pass")
+
     print web_token
     print token_pass
     room = Room.get_rooms().filter(Room.token == web_token).first()
     if room is not None:
         if room.token_pass == token_pass:
             print "valid credentials entered: [" + web_token + " : " + token_pass + "]"
-            return " "
+            return str(room.script.id)
     print "incorrect credentials"
     return abort(400)
 
@@ -264,6 +358,8 @@ def check_room_by_form():
 @api_controller.route("/api/backend/all_scripts", methods=['POST'])
 def get_all_scripts():
     backend_token = request.json.get("backend-token")
+    web_token = request.json.get("web_token")
+    count = Bot.get_bots().join(Bot.room).filter(Room.token == web_token).count()
     response = {}
     result = []
     if backend_token != get_backend_token():
@@ -281,6 +377,7 @@ def get_all_scripts():
                 "script_image": script.script_image
             })
         response['result'] = result
+        response['bot_count'] = count
         return json_dumps(response, default=json_serial)
 
 

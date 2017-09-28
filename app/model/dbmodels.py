@@ -1,3 +1,5 @@
+from sqlalchemy import desc
+
 from app import db
 
 
@@ -80,3 +82,27 @@ class BotCommand(db.Model):
 
     command = db.relationship(RemoteCommand, foreign_keys=command_id, backref="commands")
     bot = db.relationship(Bot, foreign_keys=bot_id, backref='commands')
+
+
+class ProcessingCommands(db.Model):
+    __tablename__ = "processing_command"
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    bot_id = db.Column(db.Integer, db.ForeignKey('bots.id'))
+    command_id = db.Column(db.Integer, db.ForeignKey('remote_command.id'))
+    progress_percentage = db.Column(db.Integer)
+    progression_message = db.Column(db.String(200))
+
+    command = db.relationship(RemoteCommand, foreign_keys=command_id, backref="processing_commands")
+    bot = db.relationship(Bot, foreign_keys=bot_id, backref='processing_commands')
+
+
+class Announcements(db.Model):
+    __tablename__ = "announcements"
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    text = db.Column(db.TEXT)
+    title = db.Column(db.String(100), nullable=False)
+    post_date = db.Column(db.Date)
+
+    @staticmethod
+    def get_latest():
+        return db.session.query(Announcements).order_by(desc(Announcements.post_date))

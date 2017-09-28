@@ -30,7 +30,7 @@ def remove_bots():
                 "bot_name" : bot.ingame_name
             }
             requests.post(
-                get_website_link() + "emit/remove",
+                get_website_link() + "/emit/remove",
                 json=json_dict
             )
             return "C_D"
@@ -59,7 +59,7 @@ def update_bots():
                 "data": json.loads(bot.data)
             }
             pprint(json_dict)
-            requests.post(get_website_link() + "emit/update",  # todo fix this shit
+            requests.post(get_website_link() + "/emit/update",  # todo fix this shit
                           json=json_dict
                           )
             return "B_U"
@@ -73,7 +73,7 @@ def put_bots():
     alias = request.json.get("alias")
     script_id = request.json.get("script_id")
     data = request.json.get("data")
-    print json.dumps(data)
+    print json.dumps(alias)
     if authenticate(auth.username, auth.password):
         bots = Bot.get_bots_for_room(auth.username).all()
         for bot in bots:
@@ -97,7 +97,7 @@ def put_bots():
             "clock_in": str(newBot.clock_in)
         }
         pprint(json_dict)
-        requests.post(get_website_link() + "emit",  # todo fix this shit
+        requests.post(get_website_link() + "/emit",  # todo fix this shit
                       json=json_dict
                       )
         return "H_U"
