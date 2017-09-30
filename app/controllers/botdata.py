@@ -8,7 +8,8 @@ from flask import Blueprint, request, abort
 from requests.models import json_dumps
 from app import db
 from app.config import get_website_link
-from app.model.dbmodels import Room, Bot
+from app.controllers.logs import generate_runtime_by_date
+from app.model.dbmodels import Room, Bot, BotLog
 
 bot_controller = Blueprint('bot_controller', __name__)
 
@@ -22,6 +23,15 @@ def remove_bots():
             .join(Bot.room) \
             .filter(Room.token == auth.username, Room.token_pass == auth.password).first()
         if bot:
+            botlog = BotLog()
+            botlog.ingame_name = bot.ingame_name
+            botlog.script_id = bot.script_id
+            botlog.data = bot.data
+            botlog.ip_address = bot.ip_address
+            botlog.date = bot.clock_in.date().strftime('%m/%d/%Y')
+            botlog.runtime = generate_runtime_by_date(bot.clock_in, datetime.datetime.now())
+            botlog.room_id = bot.room_id
+            db.session.add(botlog)
             db.session.delete(bot)
             db.session.commit()
             json_dict = {

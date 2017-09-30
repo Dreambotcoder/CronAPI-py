@@ -106,3 +106,26 @@ class Announcements(db.Model):
     @staticmethod
     def get_latest():
         return db.session.query(Announcements).order_by(desc(Announcements.post_date))
+
+
+class BotLog(db.Model):
+    __tablename__ = "bot_logs"
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    room_id = db.Column(db.Integer, db.ForeignKey(Room.id))
+    ingame_name = db.Column(db.String(100), nullable=False)
+    ip_address = db.Column(db.String(15), nullable=False)
+    data = db.Column(db.String(5000))
+    date = db.Column(db.String(100), nullable=False)
+    runtime = db.Column(db.String(1000))
+    script_id = db.Column(db.Integer, db.ForeignKey("scripts.id"))
+
+    room = db.relationship(Room, foreign_keys=room_id, backref="bot_logs")
+    script = db.relationship("Script", foreign_keys=script_id, backref="bot_logs")
+
+    @staticmethod
+    def get_bot_logs():
+        return db.session.query(BotLog)
+
+    @staticmethod
+    def get_distinctive_date_logs():
+        return db.session.query(BotLog.date.distinct())

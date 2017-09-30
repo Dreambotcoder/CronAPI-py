@@ -12,6 +12,7 @@ from controllers.botdata import bot_controller
 from controllers.phoneapp import phone_controller
 from controllers.util import util_controller
 from controllers.remote import remote_controller
+from controllers.logs import logs_controller
 
 from app.model import dbmodels
 
@@ -20,8 +21,7 @@ app.register_blueprint(util_controller)
 app.register_blueprint(api_controller)
 app.register_blueprint(bot_controller)
 app.register_blueprint(phone_controller)
-
-
+app.register_blueprint(logs_controller)
 
 @app.before_first_request
 def create_db():
