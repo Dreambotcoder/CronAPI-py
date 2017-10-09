@@ -5,6 +5,7 @@ from flask import Blueprint, request, abort, json
 from requests.models import json_dumps
 from app import db
 from app.config import get_backend_token
+from app.decorators import requires_auth_header
 from app.model.dbmodels import Script, Room, Bot
 
 api_controller = Blueprint('api', __name__)
@@ -185,6 +186,7 @@ def get_bots_for_room():
 
 
 @api_controller.route("/api/rooms/create", methods=['POST'])
+
 def add_room():
     web_token = request.authorization.username
     token_pass = request.authorization.password

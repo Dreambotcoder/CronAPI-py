@@ -7,10 +7,16 @@ from sqlalchemy import func
 
 from app import db
 from app.config import get_backend_token
-from app.controllers.api import authenticate
 from app.model.dbmodels import BotLog, Room
 
 logs_controller = Blueprint('logs_controller', __name__)
+
+
+@logs_controller.route('/api/logs/bot', methods=['POST'])
+def get_specific_logs():
+    web_token = request.json.get("web_token")
+    backend_token = request.json.get("backend_token")
+    alias = request.json.get("alias")
 
 
 @logs_controller.route("/api/logs", methods=["POST"])
@@ -29,7 +35,6 @@ def get_logs():
     ).order_by(
         BotLog.date.desc()
     )
-    pprint(bot_dates)
     for log_date in bot_dates:
             logs = []
             logs_for_date = BotLog.get_bot_logs().filter(BotLog.date == log_date[0])

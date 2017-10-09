@@ -23,6 +23,7 @@ def get_backend_token():
     db = config["backend-token"]
     return db["token"]
 
+
 def get_website_link():
     config = ConfigObj(CONFIG_FILE)
     db = config["website"]

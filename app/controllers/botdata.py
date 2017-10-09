@@ -1,5 +1,6 @@
 from pprint import pprint
 
+import math
 from flask import json
 import datetime
 import requests
@@ -37,7 +38,7 @@ def remove_bots():
             json_dict = {
                 "web_token": auth.username,
                 "bot_id": bot.id,
-                "bot_name" : bot.ingame_name
+                "bot_name": bot.ingame_name
             }
             requests.post(
                 get_website_link() + "/emit/remove",
@@ -75,6 +76,18 @@ def update_bots():
             return "B_U"
         else:
             return "N_B_F"
+
+
+@bot_controller.route("/api/levels")
+def levels_test():
+    points = 0
+    for level in range(1, 100):
+        diff = int(level + 300 * math.pow(2, float(level) / 7))
+        points += diff
+        str = "Level %d = %d" % (level + 1, points / 4)
+        print str
+
+    return ""
 
 
 @bot_controller.route("/api/room/bots", methods=['POST'])
