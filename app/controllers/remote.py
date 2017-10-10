@@ -4,7 +4,7 @@ from flask import Blueprint, request, abort, json
 from app import db
 from app.config import get_website_link
 from app.controllers.api import json_serial, authenticate
-from app.model.dbmodels import Bot, Room, Script
+from app.model.dbmodels import BotSession, Room, Script
 
 remote_controller = Blueprint('emitter_controller', __name__)
 
@@ -15,13 +15,13 @@ def check_bot_cmd():
     web_token = request.authorization.username
     token_pass = request.authorization.password
     if authenticate(web_token, token_pass):
-        bot = Bot.get_bots(
+        bot = BotSession.get_bots(
         ).join(
-            Bot.room
+            BotSession.room
         ).filter(
             Room.token == web_token
         ).filter(
-            Bot.ingame_name == bot_alias
+            BotSession.alias == bot_alias
         ).first()
         if bot:
             if len(bot.commands) <= 0:
@@ -45,7 +45,7 @@ def update_remote_process():
         command = request.json.get("command")
         report_message = request.json.get("report_message")
         report_percentage = str(request.json.get("report_percentage"))
-        bot = Bot.get_bots().filter(Bot.ingame_name == bot_alias).first()
+        bot = BotSession.get_bots().filter(BotSession.alias == bot_alias).first()
         if bot:
             if bot.processing_commands:
                 command_entry = bot.processing_commands[0]

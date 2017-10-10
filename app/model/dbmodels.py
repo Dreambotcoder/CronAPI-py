@@ -17,28 +17,27 @@ class Room(db.Model):
         return db.session.query(Room)
 
 
-class Bot(db.Model):
-    __tablename__ = "bots"
+class BotSession(db.Model):
+    __tablename__ = "bot_sessions"
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     room_id = db.Column(db.Integer, db.ForeignKey(Room.id))
-    ingame_name = db.Column(db.String(100), nullable=False)
+    alias = db.Column(db.String(100), nullable=False)
     ip_address = db.Column(db.String(15), nullable=False)
-    data = db.Column(db.String(5000))
     clock_in = db.Column(db.DateTime, nullable=False)
-    clock_out = db.Column(db.DateTime)
-    active = db.Column(db.Boolean, nullable=False)
     script_id = db.Column(db.Integer, db.ForeignKey("scripts.id"))
+    account_hash = db.Column(db.String(100), db.ForeignKey('bot_hash.hash'))
 
     room = db.relationship(Room, foreign_keys=room_id, backref="bots")
     script = db.relationship("Script", foreign_keys=script_id, backref="bots")
+    bot_hash = db.relationship("BotHash", foreign_keys=account_hash, backref="bot_sessions")
 
     @staticmethod
     def get_bots():
-        return db.session.query(Bot)
+        return db.session.query(BotSession)
 
     @staticmethod
     def get_bots_for_room(web_token):
-        return db.session.query(Bot).join(Bot.room).filter(Room.token == web_token)
+        return db.session.query(BotSession).join(BotSession.room).filter(Room.token == web_token)
 
 
 class Script(db.Model):
@@ -78,22 +77,22 @@ class BotCommand(db.Model):
     __tablename__ = "bot_command"
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     command_id = db.Column(db.Integer, db.ForeignKey('remote_command.id'))
-    bot_id = db.Column(db.Integer, db.ForeignKey('bots.id'))
+    session_id = db.Column(db.Integer, db.ForeignKey('bot_sessions.id'))
 
     command = db.relationship(RemoteCommand, foreign_keys=command_id, backref="commands")
-    bot = db.relationship(Bot, foreign_keys=bot_id, backref='commands')
+    bot = db.relationship(BotSession, foreign_keys=session_id, backref='commands')
 
 
 class ProcessingCommands(db.Model):
     __tablename__ = "processing_command"
     id = db.Column(db.Integer, primary_key=True, nullable=False)
-    bot_id = db.Column(db.Integer, db.ForeignKey('bots.id'))
+    session_id = db.Column(db.Integer, db.ForeignKey('bot_sessions.id'))
     command_id = db.Column(db.Integer, db.ForeignKey('remote_command.id'))
     progress_percentage = db.Column(db.Integer)
     progression_message = db.Column(db.String(200))
 
     command = db.relationship(RemoteCommand, foreign_keys=command_id, backref="processing_commands")
-    bot = db.relationship(Bot, foreign_keys=bot_id, backref='processing_commands')
+    bot = db.relationship(BotSession, foreign_keys=session_id, backref='processing_commands')
 
 
 class Announcements(db.Model):
@@ -129,3 +128,40 @@ class BotLog(db.Model):
     @staticmethod
     def get_distinctive_date_logs():
         return db.session.query(BotLog.date.distinct())
+
+
+class Notifications(db.Model):
+    __tablename__ = "notifications"
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    clock_in = db.Column(db.DateTime)
+    title = db.Column(db.String(100), nullable=False)
+    text = db.Column(db.TEXT)
+    bot_id = db.Column(db.Integer, db.ForeignKey(BotSession.id))
+
+    bot = db.relationship(BotSession, foreign_keys=bot_id, backref="notifications")
+
+
+class BotHash(db.Model):
+    __tablename__ = "bot_hash"
+    hash = db.Column(db.String(100), primary_key=True, nullable=False)
+
+
+class SessionData(db.Model):
+    __tablename__ = "session_data"
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    session_data = db.Column(db.TEXT, nullable=False)
+    stat_data = db.Column(db.TEXT)
+    clock_in = db.Column(db.DateTime, nullable=False)
+    session_id = db.Column(db.Integer, db.ForeignKey(BotSession.id))
+
+    session = db.relationship(BotSession, foreign_keys=session_id, backref="session_data_block")
+
+    @staticmethod
+    def get_recent_data_for_session(session):
+        return db.session.query(SessionData).filter(
+            SessionData.session == session
+        ).order_by(
+            desc(
+                SessionData.clock_in
+            )
+        ).first()

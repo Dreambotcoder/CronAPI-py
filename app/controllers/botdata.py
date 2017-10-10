@@ -10,7 +10,7 @@ from requests.models import json_dumps
 from app import db
 from app.config import get_website_link
 from app.controllers.logs import generate_runtime_by_date
-from app.model.dbmodels import Room, Bot, BotLog
+from app.model.dbmodels import Room, BotSession, BotLog, Notifications, SessionData
 
 bot_controller = Blueprint('bot_controller', __name__)
 
@@ -20,8 +20,8 @@ def remove_bots():
     auth = request.authorization
     alias = request.json.get("alias")
     if authenticate(auth.username, auth.password):
-        bot = Bot.get_bots().filter(Bot.ingame_name == alias) \
-            .join(Bot.room) \
+        bot = BotSession.get_bots().filter(BotSession.alias == alias) \
+            .join(BotSession.room) \
             .filter(Room.token == auth.username, Room.token_pass == auth.password).first()
         if bot:
             botlog = BotLog()
@@ -38,7 +38,7 @@ def remove_bots():
             json_dict = {
                 "web_token": auth.username,
                 "bot_id": bot.id,
-                "bot_name": bot.ingame_name
+                "bot_name": bot.alias
             }
             requests.post(
                 get_website_link() + "/emit/remove",
@@ -50,24 +50,52 @@ def remove_bots():
         return abort(400)
 
 
+@bot_controller.route('/api/room/bots/shout/put', methods=["POST"])
+def get_shouts():
+    auth = request.authorization
+    web_token = auth.username
+    if authenticate(web_token, auth.password):
+        alias = request.json.get("alias")
+        bot = BotSession.get_bots_for_room(web_token).filter(BotSession.alias == alias).first()
+        if bot:
+            title = request.json.get("title")
+            text = request.json.get("text")
+            clock_in = datetime.datetime.utcnow()
+            notif = Notifications()
+            notif.clock_in = clock_in
+            notif.bot_id = bot.id
+            notif.text = text
+            notif.title = title
+            db.session.add(notif)
+            db.session.commit()
+            return ""
+        else:
+            return abort(200)
+    else:
+        return abort(401)
+
+
 @bot_controller.route("/api/room/bots/update", methods=["POST"])
 def update_bots():
     auth = request.authorization
-    pprint(json.dumps(request.json))
     alias = request.json.get("alias")
     data = request.json.get("data")
     if authenticate(auth.username, auth.password):
-        bot = Bot.get_bots().filter(Bot.ingame_name == alias) \
-            .join(Bot.room) \
+        session = BotSession.get_bots().filter(BotSession.alias == alias) \
+            .join(BotSession.room) \
             .filter(Room.token == auth.username, Room.token_pass == auth.password).first()
-        if bot:
-            bot.data = str(json_dumps(data))
-            db.session.add(bot)
+        if session:
+            data_entry = SessionData()
+            data_entry.clock_in = datetime.datetime.utcnow()
+            data_entry.session_data = json_dumps(data)
+            data_entry.session_id = session.id
+            db.session.add(data_entry)
             db.session.commit()
+            pprint(json_dumps(data))
             json_dict = {
-                "bot_id": bot.id,
+                "bot_id": session.id,
                 "web_token": auth.username,
-                "data": json.loads(bot.data)
+                "data": json_dumps(data)
             }
             pprint(json_dict)
             requests.post(get_website_link() + "/emit/update",  # todo fix this shit
@@ -98,12 +126,12 @@ def put_bots():
     data = request.json.get("data")
     print json.dumps(alias)
     if authenticate(auth.username, auth.password):
-        bots = Bot.get_bots_for_room(auth.username).all()
+        bots = BotSession.get_bots_for_room(auth.username).all()
         for bot in bots:
-            if bot.ingame_name == alias:
+            if bot.alias == alias:
                 return "B_A_E"
-        newBot = Bot()
-        newBot.ingame_name = alias
+        newBot = BotSession()
+        newBot.alias = alias
         newBot.clock_in = datetime.datetime.utcnow()
         newBot.script_id = script_id
         newBot.active = True
@@ -114,7 +142,7 @@ def put_bots():
         db.session.commit()
         json_dict = {
             "web_token": auth.username,
-            "bot_alias": newBot.ingame_name,
+            "bot_alias": newBot.alias,
             "bot_id": int(newBot.id),
             "ip_address": newBot.ip_address,
             "clock_in": str(newBot.clock_in)

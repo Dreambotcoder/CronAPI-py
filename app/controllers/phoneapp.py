@@ -2,7 +2,7 @@ from pprint import pprint
 
 from flask import Blueprint, request, abort, json
 from app import db
-from app.model.dbmodels import Room, Script, Bot
+from app.model.dbmodels import Room, Script, BotSession
 
 phone_controller = Blueprint("phone_controller", __name__)
 
@@ -23,7 +23,7 @@ def botlist_concrete(id):
     auth = request.authorization
     game_data = {}
     if authenticate(auth.username,auth.password):
-        bot = Bot.get_bots().filter(Bot.id == id).join(Bot.room).filter(Room.token == auth.username).first()
+        bot = BotSession.get_bots().filter(BotSession.id == id).join(BotSession.room).filter(Room.token == auth.username).first()
 
         data = json.loads(bot.data)
         if bot:
@@ -50,7 +50,7 @@ def botlist():
     if authenticate(auth.username, auth.password):
         script = Script.get_scripts().join(Script.rooms).filter(Room.token == auth.username,
                                                                 Room.token_pass == auth.password).first()
-        bots = Bot.get_bots_for_room(auth.username).all()
+        bots = BotSession.get_bots_for_room(auth.username).all()
         if script and bots:
             script_info = {
                 "name": script.script_name,

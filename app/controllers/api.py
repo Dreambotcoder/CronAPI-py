@@ -1,4 +1,5 @@
 import datetime
+from pprint import pprint
 
 from flask import Blueprint, request, abort, json
 
@@ -6,7 +7,7 @@ from requests.models import json_dumps
 from app import db
 from app.config import get_backend_token
 from app.decorators import requires_auth_header
-from app.model.dbmodels import Script, Room, Bot
+from app.model.dbmodels import Script, Room, BotSession, SessionData
 
 api_controller = Blueprint('api', __name__)
 
@@ -81,33 +82,41 @@ def get_specific_bot():
     bot_id = request.json.get("bot_id")
     response = {}
     bot_data = []  #
-    bot = Bot.get_bots().filter(Bot.id == bot_id).join(Bot.room).filter(Room.token == web_token).first()
-    if bot is None:
+    notif_data = []
+    session = BotSession.get_bots().filter(BotSession.id == bot_id).join(BotSession.room).filter(Room.token == web_token).first()
+    if session is None:
         return abort(400)
-    data = json.loads(bot.data)
+    data_block = SessionData.get_recent_data_for_session(session)
+    for notification in session.notifications:
+        notif_data.append({
+            "title": notification.title,
+            "text": notification.text,
+            "timestamp" : notification.clock_in
+        })
     bot_data.append({
-        "bot_name": bot.ingame_name,
-        "ip_address": bot.ip_address,
-        "game_data": data,
-        "clock_in": bot.clock_in,
-        "clock_out": bot.clock_out,
-        "active": bot.active,
-        "script_id": bot.script_id
+        "bot_name": session.alias,
+        "ip_address": session.ip_address,
+        "game_data": json.loads(data_block.session_data),
+        "clock_in": session.clock_in,
+        "script_id": session.script_id,
+        "notifications" : notif_data
     })
+
     response['bot_data'] = bot_data
+    print json_dumps(response, default=json_serial)
     return json_dumps(response, default=json_serial)
 
 
 @api_controller.route('/api/bots/web/format/remote', methods=['POST'])
 def get_compact_bots_for_room():
-    bots = Bot.get_bots()
+    bots = BotSession.get_bots()
     response = {}
     bot_data = []
     processed_data = []
     polling_data = []
     web_token = request.json.get("web_token")
     script_id = request.json.get("script_id")
-    all_bots = bots.join(Bot.room).filter(Room.token == web_token).filter(Room.script_id == script_id)
+    all_bots = bots.join(BotSession.room).filter(Room.token == web_token).filter(Room.script_id == script_id)
     for bot in all_bots.all():
         processing_command = bot.processing_commands
         polling_command = bot.commands
@@ -127,7 +136,7 @@ def get_compact_bots_for_room():
         else:
             bot_data.append({
                 "bot_id": bot.id,
-                "bot_name": bot.ingame_name
+                "bot_name": bot.alias
             })
     response['available'] = bot_data
     response['processing'] = processed_data
@@ -137,22 +146,21 @@ def get_compact_bots_for_room():
 
 @api_controller.route("/api/bots/web", methods=['POST'])
 def get_bots_for_room_web():
-    bots = Bot.get_bots()
+    bots = BotSession.get_bots()
     response = {}
     bot_data = []
     web_token = request.json.get("web_token")
-    filtered_bots = bots.join(Bot.room).filter(Room.token == web_token)
+    filtered_bots = bots.join(BotSession.room).filter(Room.token == web_token)
 
     for bot in filtered_bots.all():
+        pprint(bot.session_data_block)
         bot_data.append({
             "bot_id": bot.id,
-            "bot_name": bot.ingame_name,
+            "bot_name": bot.alias,
             "ip_address": bot.ip_address,
-            "game_data": bot.data,
-            "clock_in": bot.clock_in,
-            "clock_out": bot.clock_out,
-            "active": bot.active,
-            "script_id": bot.script_id
+            "game_data": json.loads(SessionData.get_recent_data_for_session(bot).session_data),
+            "script_id": bot.script_id,
+            "hash" : str(bot.bot_hash.hash)
         })
     response['bot_data'] = bot_data
     response['status_code'] = 200
@@ -162,12 +170,12 @@ def get_bots_for_room_web():
 
 @api_controller.route("/api/bots/", methods=['POST'])
 def get_bots_for_room():
-    bots = Bot.get_bots()
+    bots = BotSession.get_bots()
     data = request.form
     response = {}
     bot_data = []
     web_token = data['token']
-    filtered_bots = bots.join(Bot.room).filter(Room.token == web_token)
+    filtered_bots = bots.join(BotSession.room).filter(Room.token == web_token)
 
     for bot in filtered_bots.all():
         bot_data.append({
@@ -242,7 +250,7 @@ def check_room():
 def get_all_scripts():
     backend_token = request.json.get("backend-token")
     web_token = request.json.get("web_token")
-    count = Bot.get_bots().join(Bot.room).filter(Room.token == web_token).count()
+    count = BotSession.get_bots().join(BotSession.room).filter(Room.token == web_token).count()
     response = {}
     result = []
     if backend_token != get_backend_token():
