@@ -17,6 +17,21 @@ def heartbeat():
     return "ALIVE"
 
 
+@api_controller.route("/api/skills/levels", methods=["POST"])
+def levels():
+    bot_id = request.json.get("bot_id")
+    backend_token = request.json.get("backend_token")
+    sessionData = SessionData.get_recent_data_for_session(BotSession.get_by_id(bot_id))
+    if sessionData:
+        return json_dumps(json.loads(sessionData.stat_data), default=json_serial)
+    return abort(401)
+
+
+@api_controller.route("/api/snapshots/specific", methods=["POST"])
+def specific_snapshots():
+    pass
+
+
 @api_controller.route('/api/list/commands', methods=["POST"])
 def command_list():
     script_key = request.json.get("api_key")
@@ -83,7 +98,8 @@ def get_specific_bot():
     response = {}
     bot_data = []  #
     notif_data = []
-    session = BotSession.get_bots().filter(BotSession.id == bot_id).join(BotSession.room).filter(Room.token == web_token).first()
+    session = BotSession.get_bots().filter(BotSession.id == bot_id).join(BotSession.room).filter(
+        Room.token == web_token).first()
     if session is None:
         return abort(400)
     data_block = SessionData.get_recent_data_for_session(session)
@@ -91,15 +107,16 @@ def get_specific_bot():
         notif_data.append({
             "title": notification.title,
             "text": notification.text,
-            "timestamp" : notification.clock_in
+            "timestamp": notification.clock_in
         })
     bot_data.append({
         "bot_name": session.alias,
         "ip_address": session.ip_address,
         "game_data": json.loads(data_block.session_data),
+        "stat_data": json.loads(data_block.stat_data),
         "clock_in": session.clock_in,
         "script_id": session.script_id,
-        "notifications" : notif_data
+        "notifications": notif_data
     })
 
     response['bot_data'] = bot_data
@@ -160,7 +177,7 @@ def get_bots_for_room_web():
             "ip_address": bot.ip_address,
             "game_data": json.loads(SessionData.get_recent_data_for_session(bot).session_data),
             "script_id": bot.script_id,
-            "hash" : str(bot.bot_hash.hash)
+            "hash": str(bot.bot_hash.hash)
         })
     response['bot_data'] = bot_data
     response['status_code'] = 200
@@ -194,7 +211,6 @@ def get_bots_for_room():
 
 
 @api_controller.route("/api/rooms/create", methods=['POST'])
-
 def add_room():
     web_token = request.authorization.username
     token_pass = request.authorization.password

@@ -39,6 +39,10 @@ class BotSession(db.Model):
     def get_bots_for_room(web_token):
         return db.session.query(BotSession).join(BotSession.room).filter(Room.token == web_token)
 
+    @staticmethod
+    def get_by_id(id):
+        return db.session.query(BotSession).filter(BotSession.id == id).first()
+
 
 class Script(db.Model):
     __tablename__ = "scripts"
@@ -165,3 +169,15 @@ class SessionData(db.Model):
                 SessionData.clock_in
             )
         ).first()
+
+
+class ClientSnapshot(db.Model):
+    __tablename__ = "snapshots"
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    session_id = db.Column(db.Integer, db.ForeignKey(BotSession.id))
+    base64_img = db.Column(db.TEXT, nullable=False)
+    clock_in = db.Column(db.DateTime, nullable=False)
+    room_id = db.Column(db.Integer, db.ForeignKey(Room.id))
+
+    session = db.relationship(BotSession, foreign_keys=session_id, backref="snapshots")
+    room = db.relationship(Room, foreign_keys=room_id, backref="snapshots")

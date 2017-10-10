@@ -89,13 +89,15 @@ def update_bots():
             data_entry.clock_in = datetime.datetime.utcnow()
             data_entry.session_data = json_dumps(data)
             data_entry.session_id = session.id
+            data_entry.stat_data = json_dumps(request.json.get("skills"))
             db.session.add(data_entry)
             db.session.commit()
             pprint(json_dumps(data))
             json_dict = {
                 "bot_id": session.id,
                 "web_token": auth.username,
-                "data": json_dumps(data)
+                "data": json_dumps(data),
+                "stat_data": json_dumps(request.json.get("skills"))
             }
             pprint(json_dict)
             requests.post(get_website_link() + "/emit/update",  # todo fix this shit
