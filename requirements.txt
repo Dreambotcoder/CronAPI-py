@@ -1,3 +1,4 @@
+pygal
 BeautifulSoup
 configobj
 Flask==0.12

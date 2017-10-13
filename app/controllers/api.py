@@ -1,13 +1,16 @@
 import datetime
 from pprint import pprint
 
+import pygal
 from flask import Blueprint, request, abort, json
+from pygal import Line
+from pygal.style import DarkStyle, Style
 
 from requests.models import json_dumps
 from app import db
 from app.config import get_backend_token
 from app.decorators import requires_auth_header
-from app.model.dbmodels import Script, Room, BotSession, SessionData
+from app.model.dbmodels import Script, Room, BotSession, SessionData, ClientSnapshot
 
 api_controller = Blueprint('api', __name__)
 
@@ -27,9 +30,27 @@ def levels():
     return abort(401)
 
 
-@api_controller.route("/api/snapshots/specific", methods=["POST"])
+@api_controller.route("/api/snapshots/specific/list", methods=["POST"])
 def specific_snapshots():
-    pass
+    session_id = request.json.get("bot_id")
+    backend_token = request.json.get("backend_token")
+    snapshots = ClientSnapshot.get_snapshots_for_session_id(session_id)
+    snapshots_container = []
+    for snapshot in snapshots:
+        snapshots_container.append({
+            "id": snapshot.id,
+            "clock_in": snapshot.clock_in
+        })
+    return json.dumps(snapshots_container, default=json_serial)
+
+
+@api_controller.route("/api/snapshots/specific/base64", methods=["POST"])
+def base64_snapshot():
+    session_id = request.json.get("bot_id")
+    snapshot_id = request.json.get("snapshot_id")
+    snapshot = ClientSnapshot.get_snapshots_for_session_id(session_id).filter(ClientSnapshot.id == snapshot_id).first()
+    if snapshot:
+        return snapshot.base64_img
 
 
 @api_controller.route('/api/list/commands', methods=["POST"])
@@ -109,6 +130,17 @@ def get_specific_bot():
             "text": notification.text,
             "timestamp": notification.clock_in
         })
+
+    snapshots = ClientSnapshot.get_snapshots_for_session_id(bot_id)
+
+    snapshots_container = []
+    for snapshot in snapshots.all():
+        snapshots_container.append({
+            "id": snapshot.id,
+            "clock_in": snapshot.clock_in,
+            "name": snapshot.name
+        })
+
     bot_data.append({
         "bot_name": session.alias,
         "ip_address": session.ip_address,
@@ -116,11 +148,11 @@ def get_specific_bot():
         "stat_data": json.loads(data_block.stat_data),
         "clock_in": session.clock_in,
         "script_id": session.script_id,
-        "notifications": notif_data
+        "notifications": notif_data,
+        "snapshots": snapshots_container
     })
 
     response['bot_data'] = bot_data
-    print json_dumps(response, default=json_serial)
     return json_dumps(response, default=json_serial)
 
 
@@ -170,7 +202,6 @@ def get_bots_for_room_web():
     filtered_bots = bots.join(BotSession.room).filter(Room.token == web_token)
 
     for bot in filtered_bots.all():
-        pprint(bot.session_data_block)
         bot_data.append({
             "bot_id": bot.id,
             "bot_name": bot.alias,
@@ -211,6 +242,7 @@ def get_bots_for_room():
 
 
 @api_controller.route("/api/rooms/create", methods=['POST'])
+@requires_auth_header
 def add_room():
     web_token = request.authorization.username
     token_pass = request.authorization.password
@@ -228,6 +260,31 @@ def add_room():
     return "C"
 
 
+@api_controller.route("/api/pygal/test")
+def pygal_test():
+    cron_style = Style(
+        background="transparent",
+        plot_background='transparent',
+        foreground='#f5f5f5',
+        foreground_strong='#2ecc71',
+        foreground_subtle='#2ecc71',
+        colors=('#2ecc71', '#E8537A', '#E95355', '#E87653', '#E89B53'),
+        font_family='googlefont:Open Sans'
+    )
+    graph = Line(style=cron_style,interpolate='cubic')
+
+    graph.title = 'Strength XP progression'
+    all_data_for_session = SessionData.get_all_data_for_session(21).limit(100)
+    date_block = []
+    stat_block = []
+    for datablock in all_data_for_session:
+        stat = json.loads(datablock.stat_data)
+        date_block.append(datablock.clock_in.strftime("%Y-%m-%d %H:%M:%S"))
+        stat_block.append(stat.get("Strength").get("current_xp"))
+    graph.x_labels = date_block
+    graph.add('Strength xp', stat_block)
+    return graph.render_data_uri()
+
 @api_controller.route("/api/room/exists", methods=['POST'])
 def room_exists():
     frm = request.form
@@ -239,6 +296,7 @@ def room_exists():
 
 
 @api_controller.route("/api/script/authenticate", methods=["POST"])
+@requires_auth_header
 def auth_room():
     web_token = request.authorization.username
     token_pass = request.authorization.password

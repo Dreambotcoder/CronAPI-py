@@ -170,6 +170,10 @@ class SessionData(db.Model):
             )
         ).first()
 
+    @staticmethod
+    def get_all_data_for_session(sesh):
+        return db.session.query(SessionData).filter(SessionData.session_id == sesh)
+
 
 class ClientSnapshot(db.Model):
     __tablename__ = "snapshots"
@@ -178,6 +182,11 @@ class ClientSnapshot(db.Model):
     base64_img = db.Column(db.TEXT, nullable=False)
     clock_in = db.Column(db.DateTime, nullable=False)
     room_id = db.Column(db.Integer, db.ForeignKey(Room.id))
+    name = db.Column(db.String(250), nullable=False)
 
     session = db.relationship(BotSession, foreign_keys=session_id, backref="snapshots")
     room = db.relationship(Room, foreign_keys=room_id, backref="snapshots")
+
+    @staticmethod
+    def get_snapshots_for_session_id(sesh_id):
+        return db.session.query(ClientSnapshot).filter(ClientSnapshot.session_id == sesh_id)

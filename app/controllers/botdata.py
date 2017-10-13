@@ -10,6 +10,7 @@ from requests.models import json_dumps
 from app import db
 from app.config import get_website_link
 from app.controllers.logs import generate_runtime_by_date
+from app.decorators import requires_auth_header
 from app.model.dbmodels import Room, BotSession, BotLog, Notifications, SessionData
 
 bot_controller = Blueprint('bot_controller', __name__)
@@ -76,11 +77,13 @@ def get_shouts():
 
 
 @bot_controller.route("/api/room/bots/update", methods=["POST"])
+@requires_auth_header
 def update_bots():
     auth = request.authorization
     alias = request.json.get("alias")
     data = request.json.get("data")
     if authenticate(auth.username, auth.password):
+        print 'authed'
         session = BotSession.get_bots().filter(BotSession.alias == alias) \
             .join(BotSession.room) \
             .filter(Room.token == auth.username, Room.token_pass == auth.password).first()
@@ -92,14 +95,12 @@ def update_bots():
             data_entry.stat_data = json_dumps(request.json.get("skills"))
             db.session.add(data_entry)
             db.session.commit()
-            pprint(json_dumps(data))
             json_dict = {
                 "bot_id": session.id,
                 "web_token": auth.username,
                 "data": json_dumps(data),
                 "stat_data": json_dumps(request.json.get("skills"))
             }
-            pprint(json_dict)
             requests.post(get_website_link() + "/emit/update",  # todo fix this shit
                           json=json_dict
                           )
@@ -115,7 +116,6 @@ def levels_test():
         diff = int(level + 300 * math.pow(2, float(level) / 7))
         points += diff
         str = "Level %d = %d" % (level + 1, points / 4)
-        print str
 
     return ""
 
@@ -126,7 +126,6 @@ def put_bots():
     alias = request.json.get("alias")
     script_id = request.json.get("script_id")
     data = request.json.get("data")
-    print json.dumps(alias)
     if authenticate(auth.username, auth.password):
         bots = BotSession.get_bots_for_room(auth.username).all()
         for bot in bots:
@@ -149,7 +148,6 @@ def put_bots():
             "ip_address": newBot.ip_address,
             "clock_in": str(newBot.clock_in)
         }
-        pprint(json_dict)
         requests.post(get_website_link() + "/emit",  # todo fix this shit
                       json=json_dict
                       )
